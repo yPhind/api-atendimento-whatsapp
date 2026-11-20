@@ -184,7 +184,7 @@ async function processarMensagem(value, message, io = null) {
 
       await whatsapp.enviarTexto(
         telefone,
-        'Por favor, envie o CNPJ da empresa em uma mensagem de texto.'
+        'Por favor, envie o CNPJ com pontuações, conforme exemplo: 00.000.000/0000-00, em uma única mensagem de texto.'
       );
 
       return;
@@ -203,7 +203,7 @@ async function processarMensagem(value, message, io = null) {
 
       await whatsapp.enviarTexto(
         telefone,
-        'O CNPJ informado não possui um formato válido. Envie os 14 números do CNPJ.'
+        'O CNPJ informado não possui um formato válido. Envie o CNPJ com pontuações, exemplo: 00.000.000/0000-00.'
       );
 
       return;
@@ -217,7 +217,7 @@ async function processarMensagem(value, message, io = null) {
       if (erro.message === 'CNPJ_INVALIDO') {
         await whatsapp.enviarTexto(
           telefone,
-          'O CNPJ informado não possui um formato válido. Envie os 14 números do CNPJ.'
+          'O CNPJ informado não possui um formato válido. Envie o CNPJ com pontuações, exemplo: 00.000.000/0000-00.'
         );
 
         return;
