@@ -1,4 +1,4 @@
-const db = require("../config/database");
+const { atendimento, clientes } = require("../config/databases");
 
 function adicionarLike(condicoes, parametros, expressao, valor) {
   const texto = String(valor || "").trim();
@@ -7,50 +7,82 @@ function adicionarLike(condicoes, parametros, expressao, valor) {
   condicoes.push(`${expressao} ILIKE $${parametros.length}`);
 }
 
+async function anexarDadosClientes(registros) {
+  if (!registros.length) return registros;
+  const usuarioIds = [...new Set(registros.map(r => r.usuario_id).filter(id => id != null))];
+  const empresaIds = [...new Set(registros.map(r => r.empresa_id).filter(id => id != null))];
+
+  const [usuarios, empresas] = await Promise.all([
+    usuarioIds.length
+      ? clientes.query(
+          `SELECT id, nome, telefone FROM wb_usuarios WHERE id = ANY($1::bigint[])`,
+          [usuarioIds]
+        )
+      : Promise.resolve({ rows: [] }),
+    empresaIds.length
+      ? clientes.query(
+          `SELECT id, cnpj FROM wb_empresas WHERE id = ANY($1::bigint[])`,
+          [empresaIds]
+        )
+      : Promise.resolve({ rows: [] })
+  ]);
+
+  const mapaUsuarios = new Map(usuarios.rows.map(u => [String(u.id), u]));
+  const mapaEmpresas = new Map(empresas.rows.map(e => [String(e.id), e]));
+  return registros.map(r => {
+    const u = mapaUsuarios.get(String(r.usuario_id));
+    const e = mapaEmpresas.get(String(r.empresa_id));
+    return {
+      ...r,
+      cliente_nome: u?.nome ?? null,
+      cliente_telefone: u?.telefone ?? null,
+      empresa_cnpj: e?.cnpj ?? null
+    };
+  });
+}
+
 async function listarLogs(filtros = {}) {
   const condicoes = [];
   const parametros = [];
-
-  // Cada filtro é identificado pelo nome do campo da tela. Isso evita
-  // divergências quando a ordem das colunas ou dos inputs for alterada.
   const filtrosTexto = {
     data: "to_char(h.criado_em AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI:SS')",
     atendimento: "('#' || h.atendimento_id::text || ' ' || COALESCE(a.protocolo, 'Sem protocolo'))",
-    cliente: "COALESCE(u.nome, 'Não informado')",
     usuario: "COALESCE(hs.nome, 'Sistema')",
     acao: "(CASE h.acao WHEN 'atribuicao' THEN 'Atribuição de atendimento' WHEN 'desatribuicao' THEN 'Devolução à fila' WHEN 'assumir' THEN 'Atendimento assumido' WHEN 'alteracao_status' THEN 'Alteração de status' ELSE COALESCE(h.acao, 'Ação não informada') END)",
-    detalhes: "concat_ws(' · ', h.observacao, CASE WHEN h.valor_anterior IS NOT NULL THEN 'Antes: ' || replace(replace(h.valor_anterior::text, ': ', ':'), ', ', ',') END, CASE WHEN h.valor_novo IS NOT NULL THEN 'Depois: ' || replace(replace(h.valor_novo::text, ': ', ':'), ', ', ',') END)"
+    detalhes: "concat_ws(' · ', h.observacao, CASE WHEN h.valor_anterior IS NOT NULL THEN 'Antes: ' || h.valor_anterior::text END, CASE WHEN h.valor_novo IS NOT NULL THEN 'Depois: ' || h.valor_novo::text END)"
   };
 
   for (const [campo, expressao] of Object.entries(filtrosTexto)) {
     let valor = filtros[campo];
-
-    // Compatibilidade com relatórios gerados por versões anteriores,
-    // que enviavam os filtros de logs como uma lista posicional.
     if ((valor === undefined || valor === null || valor === "") && Array.isArray(filtros.colunas)) {
-      const indiceLegado = Object.keys(filtrosTexto).indexOf(campo);
-      valor = filtros.colunas[indiceLegado];
+      const indiceLegado = { data: 0, atendimento: 1, usuario: 3, acao: 4, detalhes: 5 }[campo];
+      valor = indiceLegado === undefined ? undefined : filtros.colunas[indiceLegado];
     }
-
     adicionarLike(condicoes, parametros, expressao, valor);
   }
 
   const where = condicoes.length ? `WHERE ${condicoes.join(" AND ")}` : "";
-  const resultado = await db.query(
-    `SELECT h.id, h.atendimento_id, a.protocolo,
+  const resultado = await atendimento.query(
+    `SELECT h.id, h.atendimento_id, a.usuario_id, a.protocolo,
             a.status AS atendimento_status, h.usuario_sistema_id,
-            hs.nome AS usuario_sistema_nome, h.acao,
-            h.valor_anterior, h.valor_novo, h.observacao, h.criado_em,
-            u.nome AS cliente_nome
+            hs.nome AS usuario_sistema_nome, h.acao, h.valor_anterior,
+            h.valor_novo, h.observacao, h.criado_em
        FROM wb_historico_atendimentos h
        JOIN wb_atendimentos a ON a.id = h.atendimento_id
        LEFT JOIN wb_usuarios_sistema hs ON hs.id = h.usuario_sistema_id
-       JOIN wb_usuarios u ON u.id = a.usuario_id
        ${where}
       ORDER BY h.criado_em DESC, h.id DESC`,
     parametros
   );
-  return resultado.rows;
+
+  let registros = await anexarDadosClientes(resultado.rows);
+  const clienteFiltro = String(filtros.cliente || filtros.colunas?.[2] || "").trim().toLocaleLowerCase("pt-BR");
+  if (clienteFiltro) {
+    registros = registros.filter(r =>
+      String(r.cliente_nome || "Não informado").toLocaleLowerCase("pt-BR").includes(clienteFiltro)
+    );
+  }
+  return registros;
 }
 
 async function listarHistoricoAtendimentos(filtros = {}) {
@@ -58,7 +90,6 @@ async function listarHistoricoAtendimentos(filtros = {}) {
   const parametros = [];
   adicionarLike(condicoes, parametros, "a.id::text", filtros.id);
   adicionarLike(condicoes, parametros, "COALESCE(a.protocolo, '')", filtros.protocolo);
-  adicionarLike(condicoes, parametros, "COALESCE(u.nome, '')", filtros.cliente);
   adicionarLike(condicoes, parametros, "COALESCE(an.nome, '')", filtros.analista);
   adicionarLike(condicoes, parametros, "COALESCE(s.nome, '')", filtros.setor);
   if (filtros.data) {
@@ -66,21 +97,26 @@ async function listarHistoricoAtendimentos(filtros = {}) {
     condicoes.push(`to_char(a.finalizado_em AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') = $${parametros.length}`);
   }
 
-  const resultado = await db.query(
-    `SELECT a.id, a.protocolo, a.status, a.descricao,
-            a.criado_em, a.iniciado_em, a.finalizado_em, a.arquivado,
-            u.nome AS cliente_nome, u.telefone AS cliente_telefone,
-            s.nome AS setor_nome, an.nome AS analista_nome, e.cnpj AS empresa_cnpj
+  const resultado = await atendimento.query(
+    `SELECT a.id, a.usuario_id, a.empresa_id, a.protocolo, a.status,
+            a.descricao, a.criado_em, a.iniciado_em, a.finalizado_em,
+            a.arquivado, s.nome AS setor_nome, an.nome AS analista_nome
        FROM wb_atendimentos a
-       JOIN wb_usuarios u ON u.id = a.usuario_id
        JOIN wb_setores s ON s.id = a.setor_id
        LEFT JOIN wb_usuarios_sistema an ON an.id = a.analista_id
-       LEFT JOIN wb_empresas e ON e.id = a.empresa_id
       WHERE ${condicoes.join(" AND ")}
       ORDER BY COALESCE(a.finalizado_em, a.atualizado_em, a.criado_em) DESC, a.id DESC`,
     parametros
   );
-  return resultado.rows;
+
+  let registros = await anexarDadosClientes(resultado.rows);
+  const clienteFiltro = String(filtros.cliente || "").trim().toLocaleLowerCase("pt-BR");
+  if (clienteFiltro) {
+    registros = registros.filter(r =>
+      String(r.cliente_nome || "").toLocaleLowerCase("pt-BR").includes(clienteFiltro)
+    );
+  }
+  return registros;
 }
 
 async function listarUsuarios(filtros = {}) {
@@ -98,7 +134,7 @@ async function listarUsuarios(filtros = {}) {
     condicoes.push(`u.setor_id::text = $${parametros.length}`);
   }
 
-  const resultado = await db.query(
+  const resultado = await atendimento.query(
     `SELECT u.id, u.nome, u.email, u.username, u.perfil,
             s.nome AS setor_nome, u.ativo, u.criado_em, u.ultimo_acesso_em
        FROM wb_usuarios_sistema u

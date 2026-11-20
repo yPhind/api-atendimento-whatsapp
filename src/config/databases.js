@@ -1,4 +1,3 @@
-
 const { Pool } = require("pg");
 
 function criarPool(database, identificacao, max = 5) {
@@ -17,7 +16,7 @@ function criarPool(database, identificacao, max = 5) {
     connectionTimeoutMillis: 5000
   });
 
-  pool.on("error", (error) => {
+  pool.on("error", error => {
     console.error(`Erro no banco ${identificacao}:`, error.message);
   });
 

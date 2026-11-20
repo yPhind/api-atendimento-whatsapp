@@ -1,16 +1,16 @@
-const db = require("../config/database");
+const { atendimento } = require("../config/databases");
 
 async function criar({ usuarioId, tokenHash, expiraEm }) {
-  const conexao = await db.connect();
+  const conexao = await atendimento.connect();
 
   try {
     await conexao.query("BEGIN");
 
     await conexao.query(
       `UPDATE wb_recuperacao_senha
-       SET utilizado_em = CURRENT_TIMESTAMP
-       WHERE usuario_sistema_id = $1
-         AND utilizado_em IS NULL`,
+          SET utilizado_em = CURRENT_TIMESTAMP
+        WHERE usuario_sistema_id = $1
+          AND utilizado_em IS NULL`,
       [usuarioId]
     );
 
@@ -31,18 +31,18 @@ async function criar({ usuarioId, tokenHash, expiraEm }) {
 }
 
 async function redefinirSenha({ tokenHash, senhaHash }) {
-  const conexao = await db.connect();
+  const conexao = await atendimento.connect();
 
   try {
     await conexao.query("BEGIN");
 
     const resultado = await conexao.query(
       `SELECT id, usuario_sistema_id
-       FROM wb_recuperacao_senha
-       WHERE token_hash = $1
-         AND utilizado_em IS NULL
-         AND expira_em > CURRENT_TIMESTAMP
-       FOR UPDATE`,
+         FROM wb_recuperacao_senha
+        WHERE token_hash = $1
+          AND utilizado_em IS NULL
+          AND expira_em > CURRENT_TIMESTAMP
+        FOR UPDATE`,
       [tokenHash]
     );
 
@@ -55,16 +55,16 @@ async function redefinirSenha({ tokenHash, senhaHash }) {
 
     await conexao.query(
       `UPDATE wb_usuarios_sistema
-       SET senha_hash = $1,
-           atualizado_em = CURRENT_TIMESTAMP
-       WHERE id = $2`,
+          SET senha_hash = $1,
+              atualizado_em = CURRENT_TIMESTAMP
+        WHERE id = $2`,
       [senhaHash, token.usuario_sistema_id]
     );
 
     await conexao.query(
       `UPDATE wb_recuperacao_senha
-       SET utilizado_em = CURRENT_TIMESTAMP
-       WHERE id = $1`,
+          SET utilizado_em = CURRENT_TIMESTAMP
+        WHERE id = $1`,
       [token.id]
     );
 
@@ -78,7 +78,4 @@ async function redefinirSenha({ tokenHash, senhaHash }) {
   }
 }
 
-module.exports = {
-  criar,
-  redefinirSenha
-};
+module.exports = { criar, redefinirSenha };

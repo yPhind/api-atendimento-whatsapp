@@ -1,28 +1,23 @@
-const db = require("../config/database");
+const { atendimento } = require("../config/databases");
 
 async function listarAtivos() {
-  const resultado = await db.query(
+  const resultado = await atendimento.query(
     `SELECT id, nome, descricao
-     FROM wb_setores
-     WHERE ativo = TRUE
-     ORDER BY id`
+       FROM wb_setores
+      WHERE ativo = TRUE
+      ORDER BY id`
   );
-
   return resultado.rows;
 }
 
 async function buscarPorId(id) {
-  const resultado = await db.query(
+  const resultado = await atendimento.query(
     `SELECT id, nome, descricao
-     FROM wb_setores
-     WHERE id = $1 AND ativo = TRUE`,
+       FROM wb_setores
+      WHERE id = $1 AND ativo = TRUE`,
     [id]
   );
-
   return resultado.rows[0] || null;
 }
 
-module.exports = {
-  listarAtivos,
-  buscarPorId
-};
+module.exports = { listarAtivos, buscarPorId };

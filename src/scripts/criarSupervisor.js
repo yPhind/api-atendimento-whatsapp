@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const readline = require("readline");
 const bcrypt = require("bcrypt");
-const db = require("../config/database");
+const { atendimento } = require("../config/databases");
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -10,9 +10,7 @@ const rl = readline.createInterface({
 });
 
 function perguntar(pergunta) {
-  return new Promise((resolve) => {
-    rl.question(pergunta, resolve);
-  });
+  return new Promise(resolve => rl.question(pergunta, resolve));
 }
 
 async function main() {
@@ -26,10 +24,10 @@ async function main() {
       throw new Error("Dados inválidos ou senha muito curta.");
     }
 
-    const existentes = await db.query(
+    const existentes = await atendimento.query(
       `SELECT COUNT(*)::int AS total
-       FROM wb_usuarios_sistema
-       WHERE perfil = 'supervisor'`
+         FROM wb_usuarios_sistema
+        WHERE perfil = 'supervisor'`
     );
 
     if (existentes.rows[0].total > 0) {
@@ -40,9 +38,9 @@ async function main() {
 
     const senhaHash = await bcrypt.hash(senha, 4);
 
-    const resultado = await db.query(
+    const resultado = await atendimento.query(
       `INSERT INTO wb_usuarios_sistema
-        (nome, email, username, senha_hash, perfil, setor_id)
+         (nome, email, username, senha_hash, perfil, setor_id)
        VALUES ($1, $2, $3, $4, 'supervisor', NULL)
        RETURNING id, nome, email, username, perfil`,
       [nome, email, username, senhaHash]
@@ -54,7 +52,7 @@ async function main() {
     process.exitCode = 1;
   } finally {
     rl.close();
-    await db.end();
+    await atendimento.end();
   }
 }
 
