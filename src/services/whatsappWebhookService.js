@@ -7,10 +7,17 @@ const empresaService = require('./empresaService');
 const whatsapp = require('./whatsappCloudService');
 
 const TEXTO_CNPJ =
-  'Para iniciar o atendimento, informe o CNPJ da empresa que deseja atender.';
+  'Olá! Para iniciar seu atendimento, informe o CNPJ da empresa que deseja atender.';
 
 const TEXTO_DESCRICAO =
-  'Descreva a sua solicitação e em seguida será atendido por um de nossos analistas.';
+  'Agora, descreva sua solicitação ou observação com o máximo de detalhes possível. Essas informações serão registradas no chamado e ajudarão nosso analista a entender como podemos ajudar.';
+
+const ROTULOS_SUPORTE = {
+  1: 'Notas fiscais, cadastros, pedidos e módulos',
+  2: 'Instalação, sistema com erro, certificado e configurações de sistema',
+  3: 'Treinamento de sistema, acompanhamentos e análise de solicitações',
+  4: '2ª via de boleto / pagamento PIX'
+};
 
 const TEXTO_EMPRESA_NAO_ENCONTRADA =
   'Não localizamos esse CNPJ em nossa base. Por favor, entre em contato com o setor comercial pelo WhatsApp (DDD) 99999-9999.';
@@ -277,7 +284,7 @@ async function processarMensagem(value, message, io = null) {
 
     await whatsapp.enviarTexto(
       telefone,
-      `Empresa identificada com sucesso: ${empresa.nome_fantasia || empresa.razao_social}.`
+      `CNPJ identificado com sucesso!\nEmpresa: ${empresa.nome_fantasia || empresa.razao_social}.\n\nAgora, escolha o tipo de suporte desejado no menu abaixo.`
     );
 
     await whatsapp.enviarMenuSetores(telefone);
@@ -312,7 +319,7 @@ async function processarMensagem(value, message, io = null) {
 
       await whatsapp.enviarTexto(
         telefone,
-        'Por favor, selecione um dos setores disponíveis no menu.'
+        'Por favor, selecione uma das opções de suporte disponíveis no menu.'
       );
 
       await whatsapp.enviarMenuSetores(telefone);
@@ -422,7 +429,7 @@ async function processarMensagem(value, message, io = null) {
       telefone,
       `Sua solicitação foi registrada!\n` +
       `Protocolo: ${resultado.atendimento.protocolo}\n` +
-      `Setor: ${resultado.setor.nome}\n\n` +
+      `Tipo de suporte: ${ROTULOS_SUPORTE[Number(setor.id)] || resultado.setor.nome}\n\n` +
       'Um de nossos analistas dará continuidade ao atendimento por aqui.'
     );
   }
