@@ -47,39 +47,39 @@ async function enviarMenuSetores(telefone) {
       type: 'list',
       header: {
         type: 'text',
-        text: 'Atendimento'
+        text: 'Central de suporte'
       },
       body: {
-        text: 'Olá! Selecione o setor para o qual deseja atendimento.'
+        text: 'Olá! Selecione abaixo o tipo de suporte que melhor corresponde à sua necessidade.'
       },
       footer: {
         text: 'Escolha uma das opções abaixo.'
       },
       action: {
-        button: 'Ver setores',
+        button: 'Ver opções',
         sections: [
           {
-            title: 'Setores disponíveis',
+            title: 'Tipos de suporte',
             rows: [
               {
                 id: 'setor_1',
-                title: 'Suporte expresso',
-                description: 'Emissão de NF-e, NFC-e, Cadastros e uso diário.'
+                title: 'Notas fiscais/pedidos',
+                description: 'Notas fiscais, cadastros, pedidos e módulos'
               },
               {
                 id: 'setor_2',
-                title: 'Suporte técnico',
-                description: 'Instalação de sistema, '
+                title: 'Instalação e erros',
+                description: 'Instalação, sistema com erro, certificado e configurações de sistema'
               },
               {
                 id: 'setor_3',
                 title: 'Treinamento',
-                description: 'Treinamento de uso de sistema.'
+                description: 'Treinamento de sistema, acompanhamentos e análise de solicitações'
               },
               {
                 id: 'setor_4',
-                title: 'Financeiro',
-                description: '2ª Via de fatura/Pagamentos.'
+                title: 'Boletos e PIX',
+                description: '2ª via de boleto / pagamento PIX'
               }
             ]
           }
